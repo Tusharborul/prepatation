@@ -248,6 +248,16 @@ function setupStorageIpcHandlers() {
     });
 
     // ============ CLEAR ALL ============
+    ipcMain.handle('storage:clear-sensitive', async () => {
+        try {
+            storage.clearSensitiveData();
+            return { success: true };
+        } catch (error) {
+            console.error('Error clearing sensitive data:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
     ipcMain.handle('storage:clear-all', async () => {
         try {
             storage.clearAllData();

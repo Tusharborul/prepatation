@@ -102,6 +102,10 @@ const storage = {
         return ipcRenderer.invoke('storage:clear-all');
     },
 
+    async clearSensitive() {
+        return ipcRenderer.invoke('storage:clear-sensitive');
+    },
+
     // Limits
     async getTodayLimits() {
         const result = await ipcRenderer.invoke('storage:get-today-limits');
@@ -768,8 +772,8 @@ ipcRenderer.on('save-screen-analysis', async (event, data) => {
 
 // Listen for emergency erase command from main process
 ipcRenderer.on('clear-sensitive-data', async () => {
-    console.log('Clearing all data...');
-    await storage.clearAll();
+    console.log('Clearing sensitive data (API keys retained)...');
+    await storage.clearSensitive();
 });
 
 // Handle shortcuts based on current view

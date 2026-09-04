@@ -126,15 +126,50 @@ function needsReset() {
     }
 }
 
+// Entries a reset clears. Downloaded models and binaries are deliberately left
+// alone: they are large, often locked by a running process, and hold nothing
+// user-specific.
+const RESETTABLE_ENTRIES = ['config.json', 'credentials.json', 'preferences.json', 'keybinds.json', 'limits.json', 'history', 'logs'];
+
+function backupConfigState(configDir) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupDir = `${configDir}-backup-${stamp}`;
+
+    try {
+        fs.mkdirSync(backupDir, { recursive: true });
+        ['config.json', 'credentials.json', 'preferences.json', 'keybinds.json'].forEach(name => {
+            const source = path.join(configDir, name);
+            if (fs.existsSync(source)) {
+                fs.copyFileSync(source, path.join(backupDir, name));
+            }
+        });
+        console.log('Previous config backed up to', backupDir);
+        return backupDir;
+    } catch (error) {
+        console.error('Could not back up config before reset:', error.message);
+        return null;
+    }
+}
+
 // Wipe and reinitialize the config directory
 function resetConfigDir() {
     const configDir = getConfigDir();
 
     console.log('Resetting config directory...');
 
-    // Remove existing directory if it exists
     if (fs.existsSync(configDir)) {
-        fs.rmSync(configDir, { recursive: true, force: true });
+        backupConfigState(configDir);
+
+        RESETTABLE_ENTRIES.forEach(name => {
+            const target = path.join(configDir, name);
+            try {
+                if (fs.existsSync(target)) {
+                    fs.rmSync(target, { recursive: true, force: true });
+                }
+            } catch (error) {
+                console.error(`Could not remove ${name} during reset:`, error.message);
+            }
+        });
     }
 
     // Create fresh directory structure
@@ -501,6 +536,35 @@ function clearAllData() {
     return true;
 }
 
+// Emergency erase: drop everything that reveals what the app was used for,
+// but keep API keys so the user is not locked out afterwards.
+function clearSensitiveData() {
+    try {
+        deleteAllSessions();
+    } catch (error) {
+        console.error('Error clearing sessions:', error.message);
+    }
+
+    try {
+        const logsDir = path.join(getConfigDir(), 'logs');
+        if (fs.existsSync(logsDir)) {
+            fs.rmSync(logsDir, { recursive: true, force: true });
+        }
+    } catch (error) {
+        console.error('Error clearing logs:', error.message);
+    }
+
+    try {
+        const preferences = getPreferences();
+        preferences.customPrompt = '';
+        writeJsonFile(getPreferencesPath(), preferences);
+    } catch (error) {
+        console.error('Error clearing custom prompt:', error.message);
+    }
+
+    return true;
+}
+
 module.exports = {
     // Initialization
     initializeStorage,
@@ -546,4 +610,5 @@ module.exports = {
 
     // Clear all
     clearAllData,
+    clearSensitiveData,
 };
